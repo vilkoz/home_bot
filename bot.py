@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from telegram import ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import logging
 
@@ -22,6 +23,10 @@ shared["admins"]["Vilko"] = True
 
 # users tracking list
 from data import USERS
+
+# list of avaliable commands
+COMMAND_LIST = ['start', 'help', 'subscribe', 'scan_network', 'check_users', 'wake_home']
+COMMAND_LIST_MD = [x.replace("_", "\_") for x in COMMAND_LIST]
 
 # old scan function
 def scanNetwork():
@@ -67,7 +72,7 @@ def wakeHomeCommand(bot, update):
     except subprocess.CalledProcessError as e:
         output = e.output
         returnCode = e.returncode
-    update.message.reply_text('```' + output + '```', parse_mode="Markdown")
+    update.message.reply_text('```' + output.decode() + '```', parse_mode="Markdown")
 
 def scanNetworkCommand(bot, update):
     if not checkAccessRights(update):
@@ -121,6 +126,16 @@ def sendInfoToSubscribers(bot, job):
                 bot.sendMessage(chat_id=chatId, text=string)
         shared["users"] = newStatus
 
+# on custom keyboard
+
+def keyboardStart(bot, update, text):
+    chat_id = update.message.chat.id
+    custom_keyboard = [["/" + x] for x in COMMAND_LIST]
+    reply_markup = ReplyKeyboardMarkup(custom_keyboard)
+    bot.send_message(chat_id=chat_id, 
+                     text=text, 
+                     reply_markup=reply_markup)
+
 # Define a few command handlers. These usually take the two arguments bot and
 # update. Error handlers also receive the raised TelegramError object in error.
 def start(bot, update):
@@ -130,11 +145,15 @@ def start(bot, update):
 
 def help(bot, update):
     """Send a message when the command /help is issued."""
-    update.message.reply_text('/check_users\n/scan_network\n/subscribe\n/start')
+    reply = "**Avaliable commands:**\n"
+    reply += "\n".join(["/" + x for x in COMMAND_LIST_MD])
+    bot.send_message(chat_id=update.message.chat.id, text=reply, parse_mode="Markdown")
+    keyboardStart(bot, update)
 
 
 def echo(bot, update):
     """Echo the user message."""
+    keyboardStart(bot, update, "just press on keyboard")
     update.message.reply_text(update.message.text)
 
 
