@@ -16,32 +16,28 @@ logger = logging.getLogger(__name__)
 # dict for shared info
 shared = {}
 shared["subs"] = [117155777]
-shared["users"] = []
+shared["users"] = {}
+shared["admins"] = {}
+shared["admins"]["Vilko"] = True
 
 # users tracking list
 from data import USERS
 
 # old scan function
 def scanNetwork():
-    res = [False] * len(USERS)
     try:
-        output = subprocess.check_output("nmap -sP 192.168.0.1/24 | grep \"scan report for\" | awk '{print $5}'", shell=True)
-        output1 = subprocess.check_output("arp -a | grep -v \\<incomplete\\> | awk '{print $2}' | tr -d \\(\\)", shell=True)
+        output = subprocess.check_output("nmap 192.168.0.1/24", shell=True)
+        output1 = subprocess.check_output("arp -a | grep -v \\<incomplete\\>", shell=True)
         print ("out: ", output)
         print ("out1: ", output1)
-    except Exception:
-        return res
-    ips = output.decode().split("\n")
-    ips += output1.decode().split("\n")
-    print ("ips: ", ips)
-    for i, user in enumerate(USERS):
-        if user[1] in ips:
-            res[i] = True
-    print(res)
-    return res;
+    except Exception as e:
+        return str(e)
+    ips = output.decode()
+    ips += output1.decode()
+    return ips
 
 # net scan function, returns bool list 
-def chekUsers():
+def checkUsers():
     res = [False] * len(USERS)
     for i, user in enumerate(USERS):
         try:
@@ -56,7 +52,44 @@ def chekUsers():
             res[i] = True
     return res
 
+def checkAccessRights(update):
+    if update.effective_user.username not in shared["admins"]:
+        update.message.reply_text("You can't perform this action")
+        return False
+    return True
+
+def wakeHomeCommand(bot, update):
+    if not checkAccessRights(update):
+        return
+    try:
+        output = subprocess.check_output("wol 40:61:86:eb:ab:58", shell=True)
+        returnCode = 0
+    except subprocess.CalledProcessError as e:
+        output = e.output
+        returnCode = e.returncode
+    update.message.reply_text('```' + output + '```', parse_mode="Markdown")
+
+def scanNetworkCommand(bot, update):
+    if not checkAccessRights(update):
+        return
+    update.message.reply_text("Starting scan network..")
+    s = scanNetwork()
+    update.message.reply_text("```" + s + "```", parse_mode="Markdown")
+
+def checkUsersCommand(bot, update):
+    if not checkAccessRights(update):
+        return
+    update.message.reply_text("Starting check users..")
+    res = checkUsers()
+    string = ""
+    for i, user in enumerate(USERS):
+        string += "%s %s home\n" % (user[0], ("is" if res[i] else "not in"))
+    update.message.reply_text(string)
+
+
 def subscribeCommand(bot, update):
+    if not checkAccessRights(update):
+        return
     chat_id = update.message.chat.id
     if chat_id not in shared["subs"]:
         subs = shared["subs"]
@@ -72,7 +105,7 @@ def sendInfoToSubscribers(bot, job):
     logger.info("---Sending info---")
     oldUserStatus = shared["users"]
     # newStatus = scanNetwork()
-    newStatus = chekUsers()
+    newStatus = checkUsers()
     print("users in job: ", shared["users"])
     print("subs in job: ", shared["subs"])
     if oldUserStatus != newStatus:
@@ -84,19 +117,20 @@ def sendInfoToSubscribers(bot, job):
         print("subs in job: ", shared["subs"])
         for chatId in shared["subs"]:
             logger.info("Sending info to %s", chatId)
-            bot.sendMessage(chat_id=chatId, text=string)
+            if len(string):
+                bot.sendMessage(chat_id=chatId, text=string)
         shared["users"] = newStatus
 
 # Define a few command handlers. These usually take the two arguments bot and
 # update. Error handlers also receive the raised TelegramError object in error.
 def start(bot, update):
     """Send a message when the command /start is issued."""
-    update.message.reply_text('Hi!')
+    update.message.reply_text('Hi! See /help for more info\n')
 
 
 def help(bot, update):
     """Send a message when the command /help is issued."""
-    update.message.reply_text('Help!')
+    update.message.reply_text('/check_users\n/scan_network\n/subscribe\n/start')
 
 
 def echo(bot, update):
@@ -118,7 +152,7 @@ def main():
     # for sendInfoToSubscribers
     j = updater.job_queue
     job_minute = j.run_repeating(sendInfoToSubscribers,
-            interval=20,
+            interval=600,
             first=0)
 
     # Get the dispatcher to register handlers
@@ -128,6 +162,9 @@ def main():
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", help))
     dp.add_handler(CommandHandler("subscribe", subscribeCommand))
+    dp.add_handler(CommandHandler("scan_network", scanNetworkCommand))
+    dp.add_handler(CommandHandler("check_users", checkUsersCommand))
+    dp.add_handler(CommandHandler("wake_home", wakeHomeCommand))
 
     # on noncommand i.e message - echo the message on Telegram
     dp.add_handler(MessageHandler(Filters.text, echo))
