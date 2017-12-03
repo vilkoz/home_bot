@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # dict for shared info
 shared = {}
-shared["subs"] = []
+shared["subs"] = [117155777]
 shared["users"] = []
 
 # users tracking list
