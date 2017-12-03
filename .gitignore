@@ -1,0 +1,7 @@
+/PASSWORDS
+/data.py
+*.swp
+*.swo
+/venv
+/venv3
+__pycache__/
