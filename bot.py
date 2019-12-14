@@ -126,8 +126,7 @@ def sendInfoToSubscribers(bot, job):
                 bot.sendMessage(chat_id=chatId, text=string)
         shared["users"] = newStatus
 
-# on custom keyboard
-
+# send custom keyboard with commands
 def keyboardStart(bot, update, text):
     chat_id = update.message.chat.id
     custom_keyboard = [["/" + x] for x in COMMAND_LIST]
@@ -148,7 +147,7 @@ def help(bot, update):
     reply = "**Avaliable commands:**\n"
     reply += "\n".join(["/" + x for x in COMMAND_LIST_MD])
     bot.send_message(chat_id=update.message.chat.id, text=reply, parse_mode="Markdown")
-    keyboardStart(bot, update)
+    keyboardStart(bot, update, "press what you want on keyboard")
 
 
 def echo(bot, update):
